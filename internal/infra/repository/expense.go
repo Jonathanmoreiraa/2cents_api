@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -81,6 +82,9 @@ func (database *expenseDatabase) FindByFilter(ctx context.Context, filters map[s
 	if categories, ok := filters["categories"]; ok && len(categories.([]int)) > 0 {
 		query = query.Where("category_id IN ?", categories)
 	}
+	if category, ok := filters["category_id"]; ok {
+		query = query.Where("category_id = ?", category)
+	}
 	if status, ok := filters["status"]; ok && status != nil {
 		statusStruct := status.(struct {
 			Pending bool `json:"pending"`
@@ -114,6 +118,7 @@ func (database *expenseDatabase) FindByFilter(ctx context.Context, filters map[s
 	}
 
 	err := query.Find(&expenses).Error
+	fmt.Println(query.Debug().Find(&expenses))
 
 	return expenses, err
 }

@@ -22,12 +22,12 @@ type SavingHandler struct {
 }
 
 type SavingAddRequest struct {
-	Description     string          `json:"description" gorm:"not null;type:varchar(255)"`
-	Goal            decimal.Decimal `json:"goal" gorm:"not null;type:decimal(19,2)"`
-	Accumulated     decimal.Decimal `json:"accumulated" gorm:"not null;type:decimal(19,2)"`
-	IsEmergencyFund int             `json:"is_emergency_fund" gorm:"type:tinyint(1);not null;default:0"`
-	ShouldBeExpense int             `json:"should_be_expense" gorm:"type:tinyint(1);not null;default:0"`
-	MonthsToGoal    int             `json:"months_to_goal" gorm:"not null;default:0"`
+	Description     string          `json:"description"`
+	Goal            decimal.Decimal `json:"goal"`
+	Accumulated     decimal.Decimal `json:"accumulated"`
+	IsEmergencyFund int             `json:"is_emergency_fund"`
+	ShouldBeExpense int             `json:"should_be_expense"`
+	MonthsToGoal    int             `json:"months_to_goal"`
 }
 
 func NewSavingHandler(usecase saving_contract.SavingUseCase, expenseHandler *ExpenseHandler) *SavingHandler {
@@ -67,6 +67,29 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 	}
 
 	saving.UserID = userId
+	saving.Priority = 1
+	if list, err := cr.savingUseCase.GetAllSavings(ctx.Request.Context(), userId); err == nil && len(list) > 0 {
+		maxPriority := 0
+		existEmergencyFund := false
+		for _, s := range list {
+			if s.Priority > maxPriority {
+				maxPriority = s.Priority
+			}
+
+			if s.IsEmergencyFund > 0 {
+				existEmergencyFund = true
+			}
+		}
+		saving.Priority = maxPriority + 1
+		if saving.IsEmergencyFund == 1 && existEmergencyFund {
+			ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    http.StatusUnprocessableEntity,
+				"message": error_message.ErrCreateDuplicateEmergencyFund,
+			})
+			return
+		}
+	}
+
 	_, err = cr.savingUseCase.Create(ctx.Request.Context(), saving)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
@@ -130,7 +153,7 @@ func (cr *SavingHandler) FindAll(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
-			"message": "Erro ao encontrar as receitas",
+			"message": "Erro ao encontrar as caixinhas",
 		})
 		return
 	}
@@ -151,7 +174,7 @@ func (cr *SavingHandler) FindByID(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 			"code":    http.StatusBadRequest,
-			"message": "Erro ao identificar o id da receita",
+			"message": "Erro ao identificar o id da caixinha",
 		})
 		return
 	}
@@ -160,7 +183,7 @@ func (cr *SavingHandler) FindByID(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
-			"message": "Erro ao encontrar a receita",
+			"message": "Erro ao encontrar a caixinha",
 		})
 		return
 	}
@@ -175,7 +198,7 @@ func (cr *SavingHandler) Update(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 			"code":    http.StatusBadRequest,
-			"message": "Erro ao identificar o id da receita",
+			"message": "Erro ao identificar o id da caixinha",
 		})
 		return
 	}
@@ -185,7 +208,7 @@ func (cr *SavingHandler) Update(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&saving); err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    http.StatusUnprocessableEntity,
-			"message": "Erro ao realizar o login!",
+			"message": error_message.ErrUpdateSaving,
 		})
 		log.NewLogger().Error(err)
 		return
@@ -197,13 +220,13 @@ func (cr *SavingHandler) Update(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
 			"code":    http.StatusConflict,
-			"message": "Erro ao criar a conta!",
+			"message": error_message.ErrUpdateSaving,
 		})
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Receita editada com sucesso!",
+		"message": "Caixinha editada com sucesso!",
 		"data": gin.H{
 			"id": saving.ID,
 		},
@@ -215,45 +238,75 @@ func (cr *SavingHandler) Delete(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
 			"code":    http.StatusBadRequest,
-			"message": "Erro ao identificar o id da receita",
+			"message": "Erro ao identificar o id da caixinha",
 		})
 		return
-	}
-
-	requestCtx := ctx.Request.Context()
-	saving, err := cr.savingUseCase.GetSaving(requestCtx, id)
-	if err != nil {
-		ctx.AbortWithStatus(http.StatusNotFound)
 	}
 
 	userId, err := GetUserIdByToken(ctx)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
-			"code":    http.StatusUnprocessableEntity,
-			"message": "Erro ao apagar a receita",
+			"code":      http.StatusUnprocessableEntity,
+			"message":   error_message.ErrDeleteSaving,
+			"more_info": "Verifique as informações do usuário logado!",
 		})
-		return
-	}
-	if saving.UserID != userId {
-		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
-			"code":    http.StatusUnprocessableEntity,
-			"message": "Erro ao apagar a receita com esse usuário",
-		})
-		log.NewLogger().Error(fmt.Errorf("As receita com id %d não está relacionado com o usuário logado com id %d", saving.UserID, userId))
 		return
 	}
 
-	err = cr.savingUseCase.Delete(ctx, saving)
+	savingToDelete, err := cr.savingUseCase.GetSaving(ctx.Request.Context(), id)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": error_message.ErrFindSaving,
+		})
+		return
+	}
+
+	if savingToDelete.UserID != userId {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": "Erro ao apagar a caixinha com esse usuário",
+		})
+		log.NewLogger().Error(
+			fmt.Errorf("As caixinha com id %d não está relacionado com o usuário logado com id %d", savingToDelete.UserID, userId),
+		)
+		return
+	}
+
+	deletedPriority := savingToDelete.Priority
+
+	allSavings, err := cr.savingUseCase.GetAllSavings(ctx.Request.Context(), userId)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    http.StatusUnprocessableEntity,
-			"message": "Erro ao apagar a receita",
+			"message": error_message.ErrDeleteSaving,
 		})
 		return
+	}
+
+	err = cr.savingUseCase.Delete(ctx, savingToDelete)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": error_message.ErrDeleteSaving,
+		})
+		return
+	}
+
+	if len(allSavings) > 0 {
+		for _, saving := range allSavings {
+			if saving.Priority > deletedPriority {
+				saving.Priority = saving.Priority - 1
+				err = cr.savingUseCase.Update(ctx.Request.Context(), savingToDelete)
+				if err != nil {
+					log.NewLogger().Error("Erro ao atualizar prioridade do saving:", err)
+				}
+			}
+		}
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"code":    http.StatusOK,
-		"message": "Receita deletada com sucesso!",
+		"message": "Caixinha deletada com sucesso!",
 	})
 }

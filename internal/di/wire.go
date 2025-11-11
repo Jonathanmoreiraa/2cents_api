@@ -25,13 +25,15 @@ func NewHandlerGroup(
 	expenseHandler *handler.ExpenseHandler,
 	categoryHandler *handler.CategoryHandler,
 	savingHandler *handler.SavingHandler,
+	rendimentHandler *handler.RendimentsHandler,
 ) route.HandlerGroup {
 	return route.HandlerGroup{
-		UserHandler:     userHandler,
-		RevenueHandler:  revenueHandler,
-		ExpenseHandler:  expenseHandler,
-		CategoryHandler: categoryHandler,
-		SavingHandler:   savingHandler,
+		UserHandler:       userHandler,
+		RevenueHandler:    revenueHandler,
+		ExpenseHandler:    expenseHandler,
+		CategoryHandler:   categoryHandler,
+		SavingHandler:     savingHandler,
+		RendimentsHandler: rendimentHandler,
 	}
 }
 
@@ -44,6 +46,7 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 		repository.NewExpenseRepository,
 		repository.NewCategoryRepository,
 		repository.NewSavingRepository,
+		repository.NewMetricRepository,
 
 		user.NewUserUseCase,
 		revenue.NewRevenueUseCase,
@@ -56,6 +59,7 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 		handler.NewExpenseHandler,
 		handler.NewCategoryHandler,
 		handler.NewSavingHandler,
+		handler.NewRendimentsHandler,
 
 		NewHandlerGroup,
 		route.NewServerHTTP,

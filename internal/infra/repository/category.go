@@ -28,10 +28,11 @@ func (database *categoryDatabase) Create(ctx context.Context, category entity.Ca
 func (database *categoryDatabase) FindAll(ctx context.Context, userId int) ([]entity.Category, error) {
 	var categories []entity.Category
 
-	err := database.DB.
-		Where("user_id = ?", userId).
-		Where("deleted_at IS NULL").
-		Find(&categories).Error
+	query := database.DB.
+		Where("deleted_at IS NULL")
+	query.Where("user_id = ?", userId).Or("user_id IS NULL")
+	query.Order("name ASC")
+	err := query.Find(&categories).Error
 	return categories, err
 }
 
@@ -56,9 +57,7 @@ func (database *categoryDatabase) FindById(ctx context.Context, id int, userId i
 
 	query := database.DB.
 		Where("deleted_at IS NULL")
-
 	query.Where("user_id = ?", userId).Or("user_id IS NULL")
-
 	err := query.Find(&category, id).Error
 
 	return category, err

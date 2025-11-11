@@ -41,7 +41,9 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 	savingRepository := repository.NewSavingRepository(databaseProvider)
 	savingUseCase := saving.NewSavingUseCase(savingRepository)
 	savingHandler := handler.NewSavingHandler(savingUseCase, expenseHandler)
-	handlerGroup := NewHandlerGroup(userHandler, revenueHandler, expenseHandler, categoryHandler, savingHandler)
+	metricRepository := repository.NewMetricRepository(databaseProvider)
+	rendimentsHandler := handler.NewRendimentsHandler(metricRepository)
+	handlerGroup := NewHandlerGroup(userHandler, revenueHandler, expenseHandler, categoryHandler, savingHandler, rendimentsHandler)
 	serverHTTP := route.NewServerHTTP(handlerGroup)
 	return serverHTTP, nil
 }
@@ -54,12 +56,14 @@ func NewHandlerGroup(
 	expenseHandler *handler.ExpenseHandler,
 	categoryHandler *handler.CategoryHandler,
 	savingHandler *handler.SavingHandler,
+	rendimentHandler *handler.RendimentsHandler,
 ) route.HandlerGroup {
 	return route.HandlerGroup{
-		UserHandler:     userHandler,
-		RevenueHandler:  revenueHandler,
-		ExpenseHandler:  expenseHandler,
-		CategoryHandler: categoryHandler,
-		SavingHandler:   savingHandler,
+		UserHandler:       userHandler,
+		RevenueHandler:    revenueHandler,
+		ExpenseHandler:    expenseHandler,
+		CategoryHandler:   categoryHandler,
+		SavingHandler:     savingHandler,
+		RendimentsHandler: rendimentHandler,
 	}
 }

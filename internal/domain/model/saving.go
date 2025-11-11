@@ -16,6 +16,7 @@ type Saving struct {
 	Goal            decimal.Decimal `json:"goal" gorm:"not null;type:decimal(19,2)"`
 	Accumulated     decimal.Decimal `json:"accumulated" gorm:"not null;type:decimal(19,2)"`
 	IsEmergencyFund int             `json:"is_emergency_fund" gorm:"type:tinyint(1);not null;default:0"`
+	Priority        int             `json:"priority" gorm:"not null"`
 	CreatedAt       time.Time       `json:"created" gorm:"not null;"`
 	UpdatedAt       time.Time       `json:"modified" gorm:"not null;"`
 	DeletedAt       gorm.DeletedAt  `gorm:"index"`
