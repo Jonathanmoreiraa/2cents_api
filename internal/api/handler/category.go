@@ -134,7 +134,6 @@ func (cr *CategoryHandler) FindCategory(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, categories)
 }
 
-// TODO: Uma categoria com despesa não pode ser deletada
 func (cr *CategoryHandler) Delete(ctx *gin.Context) {
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {

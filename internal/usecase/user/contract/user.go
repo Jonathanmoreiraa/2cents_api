@@ -15,4 +15,5 @@ type UserUseCase interface {
 	Login(ctx context.Context, email string, password string) (map[string]any, error)
 	Update(ctx context.Context, user entity.User) error
 	GetUser(ctx context.Context, id int) (entity.User, error)
+	GetUserByColumn(ctx context.Context, column string, data string) (entity.User, error)
 }

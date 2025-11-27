@@ -24,6 +24,7 @@ var (
 	ErrCreateSaving                 = "Erro ao criar a caixinha"
 	ErrFindSaving                   = "Erro ao localizar a caixinha"
 	ErrUpdateSaving                 = "Erro ao editar a caixinha"
+	ErrUpdateAccumulated            = "Despesa deletada com sucesso, mas erro ao atualizar valor da caixinha!"
 	ErrDeleteSaving                 = "Erro ao deletar a caixinha"
 	ErrCreateDuplicateEmergencyFund = "Não é possível criar duas caixinhas do tipo reserva de emergência"
 	ErrCreateExpenseFromSaving      = "Erro ao adicionar o valor da caixinha as despesas mensais"

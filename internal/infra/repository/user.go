@@ -43,6 +43,7 @@ func (database *userDatabase) Update(ctx context.Context, user entity.User) erro
 	err := database.DB.Model(&user).Updates(map[string]interface{}{
 		"name":       user.Name,
 		"birth_date": user.BirthDate,
+		"email":      user.Email,
 		"updated_at": time.Now(),
 	}).Error
 	return err

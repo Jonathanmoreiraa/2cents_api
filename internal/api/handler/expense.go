@@ -11,6 +11,8 @@ import (
 	entity "github.com/jonathanmoreiraa/2cents/internal/domain/model"
 	category_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/category/contract"
 	expense_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/expense/contract"
+	saving_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/saving/contract"
+
 	"github.com/jonathanmoreiraa/2cents/pkg/log"
 	"github.com/shopspring/decimal"
 
@@ -20,6 +22,7 @@ import (
 type ExpenseHandler struct {
 	expenseUseCase  expense_contract.ExpenseUseCase
 	categoryUseCase category_contract.CategoryUseCase
+	savingUseCase   saving_contract.SavingUseCase
 }
 
 type ExpenseFilters struct {
@@ -30,6 +33,7 @@ type ExpenseFilters struct {
 	Paid        int             `json:"paid"`
 	DateStart   string          `json:"date_start"`
 	DateEnd     string          `json:"date_end"`
+	SavingID    int             `json:"saving_id"`
 	Status      struct {
 		Pending bool `json:"pending"`
 		Paid    bool `json:"paid"`
@@ -46,6 +50,7 @@ type ExpenseInput struct {
 	MultiplePayments bool            `json:"multiple_payments"`
 	NumInstallments  int             `json:"num_installments"`
 	PaymentDay       int             `json:"payment_day"`
+	SavingId         *int            `json:"saving_id"`
 }
 
 // TODO: criar uma rota para retornar a média de gastos dos três últimos meses
@@ -59,10 +64,11 @@ type ExpenseResponse struct {
 	CategoryID  int             `json:"category_id"`
 }
 
-func NewExpenseHandler(expenseUseCase expense_contract.ExpenseUseCase, categoryUseCase category_contract.CategoryUseCase) *ExpenseHandler {
+func NewExpenseHandler(expenseUseCase expense_contract.ExpenseUseCase, categoryUseCase category_contract.CategoryUseCase, savingUseCase saving_contract.SavingUseCase) *ExpenseHandler {
 	return &ExpenseHandler{
 		expenseUseCase:  expenseUseCase,
 		categoryUseCase: categoryUseCase,
+		savingUseCase:   savingUseCase,
 	}
 }
 
@@ -78,7 +84,29 @@ func (cr *ExpenseHandler) Create(ctx *gin.Context) {
 		return
 	}
 
-	err := cr.createExpenseInternal(ctx, input)
+	expense := entity.Expense{
+		Description: input.Description,
+		Value:       input.Value,
+		DueDate:     input.DueDate,
+		CategoryID:  input.CategoryID,
+	}
+
+	if input.SavingId != nil {
+		expense.SavingID = input.SavingId
+	}
+
+	userId, err := GetUserIdByToken(ctx)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":      http.StatusUnprocessableEntity,
+			"message":   error_message.ErrCreateExpense,
+			"more_info": "Verifique as informações do usuário logado!",
+		})
+		return
+	}
+	expense.UserID = userId
+
+	_, err = cr.expenseUseCase.Create(ctx.Request.Context(), expense, input.MultiplePayments, input.NumInstallments, input.PaymentDay)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":      http.StatusUnprocessableEntity,
@@ -92,28 +120,6 @@ func (cr *ExpenseHandler) Create(ctx *gin.Context) {
 		"code":    http.StatusOK,
 		"message": "Despesa criada com sucesso!",
 	})
-}
-
-func (cr *ExpenseHandler) createExpenseInternal(ctx *gin.Context, input ExpenseInput) error {
-	expense := entity.Expense{
-		Description: input.Description,
-		Value:       input.Value,
-		DueDate:     input.DueDate,
-		CategoryID:  input.CategoryID,
-	}
-
-	userId, err := GetUserIdByToken(ctx)
-	if err != nil {
-		return err
-	}
-	expense.UserID = userId
-
-	_, err = cr.expenseUseCase.Create(ctx.Request.Context(), expense, input.MultiplePayments, input.NumInstallments, input.PaymentDay)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (cr *ExpenseHandler) FindAll(ctx *gin.Context) {
@@ -278,12 +284,29 @@ func (cr *ExpenseHandler) Update(ctx *gin.Context) {
 	}
 
 	expense.ID = id
+	oldExpense, err := cr.expenseUseCase.GetExpense(ctx.Request.Context(), expense.ID)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
+			"code":    http.StatusConflict,
+			"message": error_message.ErrUpdateExpense,
+		})
+		return
+	}
 
 	err = cr.expenseUseCase.Update(ctx.Request.Context(), expense)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
 			"code":    http.StatusConflict,
-			"message": "Erro ao criar a conta!",
+			"message": error_message.ErrUpdateExpense,
+		})
+		return
+	}
+
+	err = cr.UpdateSavingAccumulatedByExpense(ctx, oldExpense, expense)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{
+			"code":    http.StatusPartialContent,
+			"message": error_message.ErrUpdateAccumulated,
 		})
 		return
 	}
@@ -296,7 +319,6 @@ func (cr *ExpenseHandler) Update(ctx *gin.Context) {
 	})
 }
 
-// TODO: adicionar verificação se a despesa pertence a uma caixinha para diminuir o valor
 func (cr *ExpenseHandler) Delete(ctx *gin.Context) {
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -321,6 +343,7 @@ func (cr *ExpenseHandler) Delete(ctx *gin.Context) {
 		})
 		return
 	}
+
 	if expense.UserID != userId {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    http.StatusUnprocessableEntity,
@@ -339,8 +362,46 @@ func (cr *ExpenseHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
+	if expense.SavingID != nil && expense.Paid == 1 {
+		oldExpense := expense
+		expense.Paid = 0
+
+		err = cr.UpdateSavingAccumulatedByExpense(ctx, oldExpense, expense)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{
+				"code":    http.StatusPartialContent,
+				"message": error_message.ErrUpdateAccumulated,
+			})
+			return
+		}
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"code":    http.StatusOK,
 		"message": "Despesa deletada com sucesso!",
 	})
+}
+
+func (cr *ExpenseHandler) UpdateSavingAccumulatedByExpense(ctx *gin.Context, oldExpense model.Expense, expense model.Expense) error {
+	if oldExpense.SavingID != nil {
+		saving, err := cr.savingUseCase.GetSaving(ctx, *oldExpense.SavingID)
+		if err != nil {
+			return err
+		}
+		if oldExpense.Paid == 0 && expense.Paid == 1 {
+			saving.Accumulated = saving.Accumulated.Add(expense.Value)
+			err = cr.savingUseCase.Update(ctx, saving)
+			if err != nil {
+				return err
+			}
+		} else if oldExpense.Paid == 1 && expense.Paid == 0 {
+			saving.Accumulated = saving.Accumulated.Sub(expense.Value)
+			err = cr.savingUseCase.Update(ctx, saving)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

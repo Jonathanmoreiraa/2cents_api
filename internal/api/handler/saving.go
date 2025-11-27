@@ -9,6 +9,8 @@ import (
 	error_message "github.com/jonathanmoreiraa/2cents/internal/domain/error"
 	"github.com/jonathanmoreiraa/2cents/internal/domain/model"
 	entity "github.com/jonathanmoreiraa/2cents/internal/domain/model"
+	category_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/category/contract"
+	expense_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/expense/contract"
 	saving_contract "github.com/jonathanmoreiraa/2cents/internal/usecase/saving/contract"
 	"github.com/jonathanmoreiraa/2cents/pkg/log"
 	"github.com/shopspring/decimal"
@@ -17,8 +19,9 @@ import (
 )
 
 type SavingHandler struct {
-	savingUseCase  saving_contract.SavingUseCase
-	expenseHandler *ExpenseHandler
+	savingUseCase   saving_contract.SavingUseCase
+	expenseUseCase  expense_contract.ExpenseUseCase
+	categoryUseCase category_contract.CategoryUseCase
 }
 
 type SavingAddRequest struct {
@@ -30,10 +33,15 @@ type SavingAddRequest struct {
 	MonthsToGoal    int             `json:"months_to_goal"`
 }
 
-func NewSavingHandler(usecase saving_contract.SavingUseCase, expenseHandler *ExpenseHandler) *SavingHandler {
+func NewSavingHandler(
+	usecase saving_contract.SavingUseCase,
+	expenseUseCase expense_contract.ExpenseUseCase,
+	categoryUseCase category_contract.CategoryUseCase,
+) *SavingHandler {
 	return &SavingHandler{
-		savingUseCase:  usecase,
-		expenseHandler: expenseHandler,
+		savingUseCase:   usecase,
+		expenseUseCase:  expenseUseCase,
+		categoryUseCase: categoryUseCase,
 	}
 }
 
@@ -64,6 +72,8 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 		Goal:            savingRequest.Goal,
 		Accumulated:     savingRequest.Accumulated,
 		IsEmergencyFund: savingRequest.IsEmergencyFund,
+		ShouldBeExpense: savingRequest.ShouldBeExpense,
+		MonthsToGoal:    savingRequest.MonthsToGoal,
 	}
 
 	saving.UserID = userId
@@ -90,7 +100,7 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 		}
 	}
 
-	_, err = cr.savingUseCase.Create(ctx.Request.Context(), saving)
+	savingNew, err := cr.savingUseCase.Create(ctx.Request.Context(), saving)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    http.StatusUnprocessableEntity,
@@ -108,11 +118,11 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 		expenseInput.MultiplePayments = true
 		expenseInput.NumInstallments = savingRequest.MonthsToGoal
 		expenseInput.PaymentDay = 1
-
+		expenseInput.SavingId = &savingNew.ID
 		t := time.Now()
 		expenseInput.DueDate = &t
 
-		categoryId, err := cr.expenseHandler.categoryUseCase.GetCategory(ctx, "Caixinha", nil)
+		categoryId, err := cr.categoryUseCase.GetCategory(ctx, "Caixinha", nil)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    http.StatusUnprocessableEntity,
@@ -122,7 +132,7 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 		}
 		expenseInput.CategoryID = categoryId[0].ID
 
-		err = cr.expenseHandler.createExpenseInternal(ctx, expenseInput)
+		err = cr.createExpenseBySaving(ctx, expenseInput)
 		if err != nil {
 			ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    http.StatusUnprocessableEntity,
@@ -136,6 +146,32 @@ func (cr *SavingHandler) Create(ctx *gin.Context) {
 		"code":    http.StatusOK,
 		"message": "Caixinha criada com sucesso!",
 	})
+}
+
+func (cr *SavingHandler) createExpenseBySaving(ctx *gin.Context, input ExpenseInput) error {
+	expense := entity.Expense{
+		Description: input.Description,
+		Value:       input.Value,
+		DueDate:     input.DueDate,
+		CategoryID:  input.CategoryID,
+	}
+
+	if input.SavingId != nil {
+		expense.SavingID = input.SavingId
+	}
+
+	userId, err := GetUserIdByToken(ctx)
+	if err != nil {
+		return err
+	}
+	expense.UserID = userId
+
+	_, err = cr.expenseUseCase.Create(ctx.Request.Context(), expense, input.MultiplePayments, input.NumInstallments, input.PaymentDay)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (cr *SavingHandler) FindAll(ctx *gin.Context) {
@@ -274,15 +310,7 @@ func (cr *SavingHandler) Delete(ctx *gin.Context) {
 	}
 
 	deletedPriority := savingToDelete.Priority
-
-	allSavings, err := cr.savingUseCase.GetAllSavings(ctx.Request.Context(), userId)
-	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
-			"code":    http.StatusUnprocessableEntity,
-			"message": error_message.ErrDeleteSaving,
-		})
-		return
-	}
+	// savingToDelete.Priority = 0
 
 	err = cr.savingUseCase.Delete(ctx, savingToDelete)
 	if err != nil {
@@ -293,11 +321,20 @@ func (cr *SavingHandler) Delete(ctx *gin.Context) {
 		return
 	}
 
+	allSavings, err := cr.savingUseCase.GetAllSavings(ctx.Request.Context(), userId)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": error_message.ErrDeleteSaving,
+		})
+		return
+	}
+
 	if len(allSavings) > 0 {
 		for _, saving := range allSavings {
-			if saving.Priority > deletedPriority {
+			if !saving.DeletedAt.Valid && saving.Priority > deletedPriority {
 				saving.Priority = saving.Priority - 1
-				err = cr.savingUseCase.Update(ctx.Request.Context(), savingToDelete)
+				err = cr.savingUseCase.Update(ctx.Request.Context(), saving)
 				if err != nil {
 					log.NewLogger().Error("Erro ao atualizar prioridade do saving:", err)
 				}
@@ -305,8 +342,35 @@ func (cr *SavingHandler) Delete(ctx *gin.Context) {
 		}
 	}
 
+	err = cr.DeleteExpenseBySaving(ctx, userId, savingToDelete.ID)
+	if err != nil {
+		log.NewLogger().Error("Erro ao apagar despesas:", err)
+		ctx.JSON(http.StatusConflict, gin.H{
+			"code":    http.StatusOK,
+			"message": "Caixinha deletada com sucesso, mas erro ao deletar despesas relacionadas!",
+		})
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"code":    http.StatusOK,
 		"message": "Caixinha deletada com sucesso!",
 	})
+}
+
+func (cr *SavingHandler) DeleteExpenseBySaving(ctx *gin.Context, userId int, savingId int) error {
+	expenses, err := cr.expenseUseCase.GetExpenseBySavingId(ctx, userId, savingId)
+	if err != nil {
+		return err
+	}
+
+	if len(expenses) > 0 {
+		for _, expense := range expenses {
+			err = cr.expenseUseCase.Delete(ctx, expense)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

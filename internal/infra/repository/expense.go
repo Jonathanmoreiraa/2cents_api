@@ -57,6 +57,17 @@ func (database *expenseDatabase) FindByID(ctx context.Context, id int) (entity.E
 	return expense, err
 }
 
+func (database *expenseDatabase) FindBySavingID(ctx context.Context, userId int, savingID int) ([]entity.Expense, error) {
+	var expenses []entity.Expense
+
+	err := database.DB.
+		Where("user_id = ?", userId).
+		Where("saving_id = ?", savingID).
+		Where("deleted_at IS NULL").
+		Find(&expenses).Error
+	return expenses, err
+}
+
 func (database *expenseDatabase) FindByFilter(ctx context.Context, filters map[string]any) ([]entity.Expense, error) {
 	var expenses []entity.Expense
 

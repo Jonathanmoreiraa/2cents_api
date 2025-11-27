@@ -56,6 +56,15 @@ func (useCase *expenseUseCase) GetExpenses(ctx context.Context, filters map[stri
 	return expense, nil
 }
 
+func (useCase *expenseUseCase) GetExpenseBySavingId(ctx context.Context, id int, savingId int) ([]entity.Expense, error) {
+	expenses, err := useCase.expenseRepo.FindBySavingID(ctx, id, savingId)
+	if err != nil {
+		return []entity.Expense{}, util.ErrorWithMessage(err, error_message.ErrFindExpense)
+	}
+
+	return expenses, nil
+}
+
 func (useCase *expenseUseCase) Update(ctx context.Context, expense entity.Expense) error {
 	err := useCase.expenseRepo.Update(ctx, expense)
 	if err != nil {

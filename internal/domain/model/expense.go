@@ -13,8 +13,8 @@ type Expense struct {
 	User        User            `json:"-" gorm:"constraint:OnUpdate:CASCADE"`
 	CategoryID  int             `json:"category_id,omitempty" gorm:"not null"`
 	Category    Category        `json:"-" gorm:"constraint:OnUpdate:CASCADE"`
-	SavingID    *int            `json:"saving_id,omitempty" gorm:"null"`
-	Saving      Saving          `json:"-" gorm:"constraint:OnUpdate:CASCADE"`
+	SavingID    *int            `json:"saving_id,omitempty" gorm:"index;constraint:OnDelete:CASCADE"`
+	Saving      *Saving         `json:"-" gorm:"constraint:OnUpdate:CASCADE"`
 	Description string          `json:"description" gorm:"not null;type:varchar(255)"`
 	Value       decimal.Decimal `json:"value" gorm:"not null;type:decimal(19,2)"`
 	DueDate     *time.Time      `json:"due_date" gorm:"type:date"`

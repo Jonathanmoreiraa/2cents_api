@@ -76,6 +76,15 @@ func (useCase *userUseCase) GetUser(ctx context.Context, id int) (entity.User, e
 	return user, nil
 }
 
+func (useCase *userUseCase) GetUserByColumn(ctx context.Context, column string, data string) (entity.User, error) {
+	user, err := useCase.userRepo.FindByColumn(ctx, column, data)
+	if err != nil {
+		return entity.User{}, util.ErrorWithMessage(err, error_message.ErrFindUser)
+	}
+
+	return user, nil
+}
+
 // func (useCase *userUseCase) Delete(ctx context.Context, user entity.User) error {
 // 	err := useCase.userRepo.Delete(ctx, user)
 

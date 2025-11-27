@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -126,9 +125,17 @@ func (cr *UserHandler) Update(ctx *gin.Context) {
 	}
 
 	user.ID = id
-
-	//TODO: adicionar uma validação para também atualizar o email e alterar no repository
-	// TODO: adicionar rota para editar a senha (ela pode ser usada no esqueci a senha tb)
+	oldUser, _ := cr.userUseCase.GetUser(ctx, id)
+	if !oldUser.DeletedAt.Valid {
+		hasEmail, _ := cr.userUseCase.GetUserByColumn(ctx, "email", user.Email)
+		if hasEmail.ID != 0 {
+			ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    http.StatusUnprocessableEntity,
+				"message": "E-mail já cadastrado!",
+			})
+			return
+		}
+	}
 
 	err = cr.userUseCase.Update(ctx.Request.Context(), user)
 	if err != nil {
@@ -180,7 +187,6 @@ func (cr *UserHandler) FindByID(ctx *gin.Context) {
 
 func (cr *UserHandler) GetCurrentUser(ctx *gin.Context) {
 	userId, err := GetUserIdByToken(ctx)
-	fmt.Println("userId", userId, ctx.Request.Header.Get("Authorization"))
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 			"code":    http.StatusUnauthorized,
