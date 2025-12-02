@@ -37,13 +37,13 @@ wire:
 	cd internal/di && wire
 
 up:
-	@docker-compose up --build
+	@docker-compose up -d
 
 down:
 	@docker-compose down -v
 
 build:
-	@docker-compose down -v && @docker-compose up --build
+	@docker-compose down -v && @docker-compose up -d --build
 
 air:
 	air

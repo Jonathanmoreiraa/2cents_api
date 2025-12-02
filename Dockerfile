@@ -7,9 +7,10 @@ RUN go mod tidy
 
 COPY . .
 
-RUN go build -o planejja cmd/api/main.go
+RUN go build -o 2cents cmd/api/main.go
 
 EXPOSE 8080
 
-RUN chmod +x planejja
-CMD ["./planejja"]
+RUN chmod +x 2cents
+
+CMD ["./2cents"]
