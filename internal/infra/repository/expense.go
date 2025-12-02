@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -129,9 +128,48 @@ func (database *expenseDatabase) FindByFilter(ctx context.Context, filters map[s
 	}
 
 	err := query.Find(&expenses).Error
-	fmt.Println(query.Debug().Find(&expenses))
 
 	return expenses, err
+}
+
+func (database *expenseDatabase) FindByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error) {
+	var expenses []entity.GraphicMonthTotal
+
+	query := database.DB.
+		Table("expenses").
+		Select(`
+			CONCAT(
+				UPPER(LEFT(DATE_FORMAT(due_date, '%M'), 1)),
+				SUBSTRING(DATE_FORMAT(due_date, '%M'), 2)
+			) AS month,
+			SUM(value) AS total
+		`).
+		Where("user_id = ? AND due_date BETWEEN ? AND ?", userId, dateStart, dateEnd).
+		Group("month").
+		Order("MIN(due_date)").
+		Where("deleted_at IS NULL").
+		Exec("SET lc_time_names = 'pt_BR'")
+
+	err := query.Find(&expenses).Error
+
+	return expenses, err
+}
+
+func (database *expenseDatabase) FindCountCategoryForExpenses(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.CategoryCount, error) {
+	var category []entity.CategoryCount
+
+	query := database.DB.
+		Table("expenses").
+		Select("SUM(expenses.value) AS category, categories.name AS nome").
+		Joins("LEFT JOIN categories ON categories.id = expenses.category_id").
+		Where("expenses.due_date BETWEEN ? AND ?", dateStart, dateEnd).
+		Where("expenses.deleted_at IS NULL").
+		Where("expenses.user_id = ?", userId).
+		Group("expenses.category_id, categories.name").
+		Order("category DESC")
+	err := query.Find(&category).Error
+
+	return category, err
 }
 
 func (database *expenseDatabase) Update(ctx context.Context, expense entity.Expense) error {

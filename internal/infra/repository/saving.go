@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	entity "github.com/jonathanmoreiraa/2cents/internal/domain/model"
@@ -32,7 +31,6 @@ func (database *savingDatabase) FindAll(ctx context.Context, userId int) ([]enti
 		Where("user_id = ?", userId).
 		Where("deleted_at IS NULL").
 		Find(&savings)
-	fmt.Println(query.Debug().Find(&savings))
 
 	err := query.Error
 	return savings, err

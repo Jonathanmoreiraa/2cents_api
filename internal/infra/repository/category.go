@@ -56,8 +56,7 @@ func (database *categoryDatabase) FindById(ctx context.Context, id int, userId i
 	var category entity.Category
 
 	query := database.DB.
-		Where("deleted_at IS NULL")
-	query.Where("user_id = ?", userId).Or("user_id IS NULL")
+		Where("deleted_at IS NULL AND (user_id = ? or user_id IS NULL) AND id = ?", userId, id)
 	err := query.Find(&category, id).Error
 
 	return category, err

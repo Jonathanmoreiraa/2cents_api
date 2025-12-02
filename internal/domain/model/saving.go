@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// TODO: ver para adicionar um valor inicial, porque o usuário pode já ter um valor guardado
 type Saving struct {
 	ID              int             `json:"id" gorm:"primaryKey;autoIncrement"`
 	UserID          int             `json:"user_id,omitempty" gorm:"not null"`

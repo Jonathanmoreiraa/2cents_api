@@ -37,3 +37,12 @@ func (useCase *metricUseCase) GetLastMetric(ctx context.Context, investimentType
 
 	return metric, nil
 }
+
+func (useCase *metricUseCase) GetLastMetricGraphic(ctx context.Context) ([]entity.LastMetrics, error) {
+	metric, err := useCase.metricRepo.GetLastMetricGraphic(ctx)
+	if err != nil {
+		return []entity.LastMetrics{}, util.ErrorWithMessage(err, error_message.ErrFindMetric)
+	}
+
+	return metric, nil
+}

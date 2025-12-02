@@ -51,9 +51,8 @@ type ExpenseInput struct {
 	NumInstallments  int             `json:"num_installments"`
 	PaymentDay       int             `json:"payment_day"`
 	SavingId         *int            `json:"saving_id"`
+	Paid             int             `json:"paid"`
 }
-
-// TODO: criar uma rota para retornar a média de gastos dos três últimos meses
 type ExpenseResponse struct {
 	ID          int             `json:"id"`
 	Description string          `json:"description"`
@@ -89,6 +88,7 @@ func (cr *ExpenseHandler) Create(ctx *gin.Context) {
 		Value:       input.Value,
 		DueDate:     input.DueDate,
 		CategoryID:  input.CategoryID,
+		Paid:        input.Paid,
 	}
 
 	if input.SavingId != nil {
@@ -237,6 +237,7 @@ func (cr *ExpenseHandler) FindByFilters(ctx *gin.Context) {
 	var expenseResponses []ExpenseResponse
 
 	for _, expense := range expenses {
+		fmt.Println("oi", expense.CategoryID)
 		category, err := cr.categoryUseCase.GetCategoryById(ctx.Request.Context(), expense.CategoryID, userId)
 		if err != nil {
 			log.NewLogger().Error(err)
@@ -251,6 +252,7 @@ func (cr *ExpenseHandler) FindByFilters(ctx *gin.Context) {
 			Category:    category.Name,
 			CategoryID:  category.ID,
 		}
+		fmt.Println(category.Name, expenseResponse.CategoryID, category.ID)
 		expenseResponses = append(expenseResponses, expenseResponse)
 	}
 

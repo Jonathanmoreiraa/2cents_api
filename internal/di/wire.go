@@ -12,6 +12,7 @@ import (
 	"github.com/jonathanmoreiraa/2cents/internal/infra/repository"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/category"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/expense"
+	"github.com/jonathanmoreiraa/2cents/internal/usecase/metric"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/revenue"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/saving"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/user"
@@ -26,6 +27,7 @@ func NewHandlerGroup(
 	categoryHandler *handler.CategoryHandler,
 	savingHandler *handler.SavingHandler,
 	rendimentHandler *handler.RendimentsHandler,
+	dashboardHandler *handler.DashboardHandler,
 ) route.HandlerGroup {
 	return route.HandlerGroup{
 		UserHandler:       userHandler,
@@ -34,6 +36,7 @@ func NewHandlerGroup(
 		CategoryHandler:   categoryHandler,
 		SavingHandler:     savingHandler,
 		RendimentsHandler: rendimentHandler,
+		DashboardHandler:  dashboardHandler,
 	}
 }
 
@@ -53,6 +56,7 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 		expense.NewExpenseUseCase,
 		category.NewCategoryUseCase,
 		saving.NewSavingUseCase,
+		metric.NewMetricUseCase,
 
 		handler.NewUserHandler,
 		handler.NewRevenueHandler,
@@ -60,6 +64,7 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 		handler.NewCategoryHandler,
 		handler.NewSavingHandler,
 		handler.NewRendimentsHandler,
+		handler.NewDashboardHandler,
 
 		NewHandlerGroup,
 		route.NewServerHTTP,

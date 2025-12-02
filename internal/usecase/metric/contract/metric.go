@@ -9,5 +9,5 @@ import (
 type MetricUseCase interface {
 	Create(ctx context.Context, metric entity.Metric) (entity.Metric, error)
 	GetLastMetric(ctx context.Context, investimentType int) (entity.Metric, error)
-	// SimulateInvestments(ctx context.Context, initialValue float64, monthlyContribution float64, months int) ([]string, error)
+	GetLastMetricGraphic(ctx context.Context) ([]entity.LastMetrics, error)
 }

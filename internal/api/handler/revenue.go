@@ -175,7 +175,7 @@ func (cr *RevenueHandler) FindByFilters(ctx *gin.Context) {
 	}
 
 	if len(revenues) <= 0 {
-		ctx.JSON(http.StatusOK, []model.Revenue{})
+		ctx.JSON(http.StatusNotFound, []model.Revenue{})
 		return
 	}
 

@@ -12,6 +12,8 @@ type ExpenseRepository interface {
 	FindByID(ctx context.Context, userId int) (entity.Expense, error)
 	FindBySavingID(ctx context.Context, userId int, savingID int) ([]entity.Expense, error)
 	FindByFilter(ctx context.Context, filters map[string]any) ([]entity.Expense, error)
+	FindByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error)
+	FindCountCategoryForExpenses(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.CategoryCount, error)
 	Update(ctx context.Context, revenue entity.Expense) error
 	Delete(ctx context.Context, revenue entity.Expense) error
 }

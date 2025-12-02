@@ -56,6 +56,24 @@ func (useCase *expenseUseCase) GetExpenses(ctx context.Context, filters map[stri
 	return expense, nil
 }
 
+func (useCase *expenseUseCase) GetExpensesByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error) {
+	expense, err := useCase.expenseRepo.FindByDates(ctx, userId, dateStart, dateEnd)
+	if err != nil {
+		return []entity.GraphicMonthTotal{}, util.ErrorWithMessage(err, error_message.ErrFindExpense)
+	}
+
+	return expense, nil
+}
+
+func (useCase *expenseUseCase) GetCountCategoryForExpenses(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.CategoryCount, error) {
+	expense, err := useCase.expenseRepo.FindCountCategoryForExpenses(ctx, userId, dateStart, dateEnd)
+	if err != nil {
+		return []entity.CategoryCount{}, util.ErrorWithMessage(err, error_message.ErrFindExpense)
+	}
+
+	return expense, nil
+}
+
 func (useCase *expenseUseCase) GetExpenseBySavingId(ctx context.Context, id int, savingId int) ([]entity.Expense, error) {
 	expenses, err := useCase.expenseRepo.FindBySavingID(ctx, id, savingId)
 	if err != nil {

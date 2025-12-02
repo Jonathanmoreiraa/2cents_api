@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -88,8 +87,30 @@ func (database *revenueDatabase) FindByFilter(ctx context.Context, filters map[s
 	}
 
 	err = query.Find(&revenues).Error
-	//TODO: Remover debug
-	fmt.Println(query.Debug().Find(&revenues))
+
+	return revenues, err
+}
+
+// TODO: verificar se o gráfico deveria ser retornado com base nas receitas recebidas ou as que ainda não recebi?
+func (database *revenueDatabase) FindByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error) {
+	var revenues []entity.GraphicMonthTotal
+
+	query := database.DB.
+		Table("revenues").
+		Select(`
+			CONCAT(
+				UPPER(LEFT(DATE_FORMAT(due_date, '%M'), 1)),
+				SUBSTRING(DATE_FORMAT(due_date, '%M'), 2)
+			) AS month,
+			SUM(value) AS total
+		`).
+		Where("user_id = ? AND received = 1 AND due_date BETWEEN ? AND ?", userId, dateStart, dateEnd).
+		Group("month").
+		Order("MIN(due_date)").
+		Where("deleted_at IS NULL").
+		Exec("SET lc_time_names = 'pt_BR'")
+
+	err := query.Find(&revenues).Error
 
 	return revenues, err
 }

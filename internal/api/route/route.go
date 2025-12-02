@@ -22,6 +22,7 @@ type HandlerGroup struct {
 	CategoryHandler   *handler.CategoryHandler
 	SavingHandler     *handler.SavingHandler
 	RendimentsHandler *handler.RendimentsHandler
+	DashboardHandler  *handler.DashboardHandler
 }
 
 func NewServerHTTP(Handlers HandlerGroup) *ServerHTTP {
@@ -71,6 +72,11 @@ func NewServerHTTP(Handlers HandlerGroup) *ServerHTTP {
 
 	api.POST("/rendiments", Handlers.RendimentsHandler.SimulateAllRendiments)
 	api.POST("/month/rendiment", Handlers.RendimentsHandler.SimulateMonthlyRendiments)
+
+	api.GET("/dashboard/last-six-months", Handlers.DashboardHandler.LastExpensesRevenueGraphic)
+	api.GET("/dashboard/month-situation", Handlers.DashboardHandler.LastMonthSituation)
+	api.GET("/dashboard/expenses-by-category", Handlers.DashboardHandler.ExpensesByCategory)
+	api.GET("/dashboard/last-metric", Handlers.DashboardHandler.GetTaxes)
 
 	engine.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{

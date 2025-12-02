@@ -14,6 +14,7 @@ import (
 	"github.com/jonathanmoreiraa/2cents/internal/infra/repository"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/category"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/expense"
+	"github.com/jonathanmoreiraa/2cents/internal/usecase/metric"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/revenue"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/saving"
 	"github.com/jonathanmoreiraa/2cents/internal/usecase/user"
@@ -43,7 +44,9 @@ func InitializeAPI(cfg config.Config) (*route.ServerHTTP, error) {
 	savingHandler := handler.NewSavingHandler(savingUseCase, expenseUseCase, categoryUseCase)
 	metricRepository := repository.NewMetricRepository(databaseProvider)
 	rendimentsHandler := handler.NewRendimentsHandler(metricRepository)
-	handlerGroup := NewHandlerGroup(userHandler, revenueHandler, expenseHandler, categoryHandler, savingHandler, rendimentsHandler)
+	metricUseCase := metric.NewMetricUseCase(metricRepository)
+	dashboardHandler := handler.NewDashboardHandler(expenseUseCase, revenueUseCase, savingUseCase, metricUseCase)
+	handlerGroup := NewHandlerGroup(userHandler, revenueHandler, expenseHandler, categoryHandler, savingHandler, rendimentsHandler, dashboardHandler)
 	serverHTTP := route.NewServerHTTP(handlerGroup)
 	return serverHTTP, nil
 }
@@ -57,6 +60,7 @@ func NewHandlerGroup(
 	categoryHandler *handler.CategoryHandler,
 	savingHandler *handler.SavingHandler,
 	rendimentHandler *handler.RendimentsHandler,
+	dashboardHandler *handler.DashboardHandler,
 ) route.HandlerGroup {
 	return route.HandlerGroup{
 		UserHandler:       userHandler,
@@ -65,5 +69,6 @@ func NewHandlerGroup(
 		CategoryHandler:   categoryHandler,
 		SavingHandler:     savingHandler,
 		RendimentsHandler: rendimentHandler,
+		DashboardHandler:  dashboardHandler,
 	}
 }
