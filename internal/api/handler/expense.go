@@ -257,7 +257,10 @@ func (cr *ExpenseHandler) FindByFilters(ctx *gin.Context) {
 	}
 
 	if len(expenseResponses) <= 0 {
-		ctx.JSON(http.StatusOK, []ExpenseResponse{})
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": "Nenhuma despesa encontrada!",
+		})
 		return
 	}
 

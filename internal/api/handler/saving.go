@@ -197,7 +197,7 @@ func (cr *SavingHandler) FindAll(ctx *gin.Context) {
 	if len(savings) == 0 {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
-			"message": error_message.ErrFindSaving,
+			"message": "Nenhuma caixinha encontrada!",
 		})
 		return
 	}

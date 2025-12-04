@@ -43,6 +43,21 @@ func (cr *UserHandler) Create(ctx *gin.Context) {
 		return
 	}
 
+	last14Years := time.Date(
+		time.Now().Year()-14,
+		time.Now().Month(),
+		time.Now().Day(),
+		0, 0, 0, 0,
+		time.Local,
+	)
+	if user.BirthDate.After(last14Years) {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": "Para cadastrar uma conta é preciso ter mais de 14 anos!",
+		})
+		return
+	}
+
 	_, err := cr.userUseCase.Create(ctx.Request.Context(), user)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
@@ -128,13 +143,28 @@ func (cr *UserHandler) Update(ctx *gin.Context) {
 	oldUser, _ := cr.userUseCase.GetUser(ctx, id)
 	if !oldUser.DeletedAt.Valid {
 		hasEmail, _ := cr.userUseCase.GetUserByColumn(ctx, "email", user.Email)
-		if hasEmail.ID != 0 {
+		if hasEmail.ID != 0 && oldUser.Email != user.Email {
 			ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    http.StatusUnprocessableEntity,
 				"message": "E-mail já cadastrado!",
 			})
 			return
 		}
+	}
+
+	last14Years := time.Date(
+		time.Now().Year()-14,
+		time.Now().Month(),
+		time.Now().Day(),
+		0, 0, 0, 0,
+		time.Local,
+	)
+	if user.BirthDate.After(last14Years) {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": "É preciso ter mais de 14 anos para utilizar o sistema!",
+		})
+		return
 	}
 
 	err = cr.userUseCase.Update(ctx.Request.Context(), user)

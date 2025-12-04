@@ -169,13 +169,16 @@ func (cr *RevenueHandler) FindByFilters(ctx *gin.Context) {
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
-			"message": "Erro ao encontrar a receita",
+			"message": error_message.ErrFindRevenue,
 		})
 		return
 	}
 
 	if len(revenues) <= 0 {
-		ctx.JSON(http.StatusNotFound, []model.Revenue{})
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": "Nenhuma receita encontrada!",
+		})
 		return
 	}
 
