@@ -69,6 +69,7 @@ func NewServerHTTP(Handlers HandlerGroup) *ServerHTTP {
 	api.GET("/savings", Handlers.SavingHandler.FindAll)
 	api.PUT("/saving/:id", Handlers.SavingHandler.Update)
 	api.DELETE("/saving/:id", Handlers.SavingHandler.Delete)
+	api.POST("/saving/filter", Handlers.SavingHandler.FindByFilters)
 
 	api.POST("/rendiments", Handlers.RendimentsHandler.SimulateAllRendiments)
 	api.POST("/month/rendiment", Handlers.RendimentsHandler.SimulateMonthlyRendiments)

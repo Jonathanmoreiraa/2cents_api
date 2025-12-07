@@ -123,9 +123,7 @@ func (database *expenseDatabase) FindByFilter(ctx context.Context, filters map[s
 		}
 	}
 
-	if filters["date_start"] != nil || filters["date_end"] != nil {
-		query = query.Order("due_date ASC")
-	}
+	query = query.Order("due_date ASC")
 
 	err := query.Find(&expenses).Error
 

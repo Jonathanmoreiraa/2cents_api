@@ -32,6 +32,7 @@ func (database *revenueDatabase) FindAll(ctx context.Context, userId int) ([]ent
 	err := database.DB.
 		Where("user_id = ?", userId).
 		Where("deleted_at IS NULL").
+		Order("due_date ASC").
 		Find(&revenues).Error
 	return revenues, err
 }
@@ -86,13 +87,14 @@ func (database *revenueDatabase) FindByFilter(ctx context.Context, filters map[s
 		}
 	}
 
+	query = query.Order("due_date ASC")
 	err = query.Find(&revenues).Error
 
 	return revenues, err
 }
 
 // TODO: verificar se o gráfico deveria ser retornado com base nas receitas recebidas ou as que ainda não recebi?
-func (database *revenueDatabase) FindByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error) {
+func (database *revenueDatabase) FindByDates(ctx context.Context, userId int, dateStart string, dateEnd string, received *bool) ([]entity.GraphicMonthTotal, error) {
 	var revenues []entity.GraphicMonthTotal
 
 	query := database.DB.
@@ -104,11 +106,17 @@ func (database *revenueDatabase) FindByDates(ctx context.Context, userId int, da
 			) AS month,
 			SUM(value) AS total
 		`).
-		Where("user_id = ? AND received = 1 AND due_date BETWEEN ? AND ?", userId, dateStart, dateEnd).
+		Where("deleted_at IS NULL AND user_id = ? AND due_date BETWEEN ? AND ?", userId, dateStart, dateEnd).
 		Group("month").
 		Order("MIN(due_date)").
-		Where("deleted_at IS NULL").
 		Exec("SET lc_time_names = 'pt_BR'")
+
+	receivedQuery := "received = 1"
+	if received != nil && *received == false {
+		receivedQuery = ""
+	}
+
+	query = query.Where(receivedQuery)
 
 	err := query.Find(&revenues).Error
 

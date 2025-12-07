@@ -33,6 +33,14 @@ type SavingAddRequest struct {
 	MonthsToGoal    int             `json:"months_to_goal"`
 }
 
+type SavingFilters struct {
+	Description string `json:"description"`
+	Status      struct {
+		Completed bool `json:"completed"`
+		Pending   bool `json:"pending"`
+	} `json:"status"`
+}
+
 func NewSavingHandler(
 	usecase saving_contract.SavingUseCase,
 	expenseUseCase expense_contract.ExpenseUseCase,
@@ -205,6 +213,46 @@ func (cr *SavingHandler) FindAll(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, savings)
 }
 
+func (cr *SavingHandler) FindByFilters(ctx *gin.Context) {
+	var savingsFilter SavingFilters
+	if err := ctx.ShouldBindJSON(&savingsFilter); err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": error_message.ErrFindSaving,
+		})
+		log.NewLogger().Error(err)
+		return
+	}
+
+	userId, err := GetUserIdByToken(ctx)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":      http.StatusUnprocessableEntity,
+			"message":   error_message.ErrCreateExpense,
+			"more_info": "Verifique as informações do usuário logado!",
+		})
+		log.NewLogger().Error(err)
+		return
+	}
+
+	filters := make(map[string]any)
+	filters["description"] = savingsFilter.Description
+	filters["status"] = savingsFilter.Status
+	filters["user_id"] = userId
+
+	savings, err := cr.savingUseCase.GetSavings(ctx.Request.Context(), filters)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": error_message.ErrFindSaving,
+		})
+		log.NewLogger().Error(err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, savings)
+}
+
 func (cr *SavingHandler) FindByID(ctx *gin.Context) {
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil {
@@ -252,13 +300,85 @@ func (cr *SavingHandler) Update(ctx *gin.Context) {
 
 	saving.ID = id
 
-	err = cr.savingUseCase.Update(ctx.Request.Context(), saving)
+	savingToUpdate, err := cr.savingUseCase.GetSaving(ctx.Request.Context(), id)
 	if err != nil {
-		ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
-			"code":    http.StatusConflict,
-			"message": error_message.ErrUpdateSaving,
+		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
+			"code":    http.StatusNotFound,
+			"message": error_message.ErrFindSaving,
 		})
 		return
+	}
+
+	userId, err := GetUserIdByToken(ctx)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":      http.StatusUnprocessableEntity,
+			"message":   error_message.ErrDeleteSaving,
+			"more_info": "Verifique as informações do usuário logado!",
+		})
+		return
+	}
+
+	allSavings, err := cr.savingUseCase.GetAllSavings(ctx.Request.Context(), userId)
+	if err != nil {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": error_message.ErrDeleteSaving,
+		})
+		return
+	}
+
+	if saving.Priority > len(allSavings) {
+		ctx.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
+			"code":    http.StatusUnprocessableEntity,
+			"message": "A prioridade informada é maior que o número de caixinhas existente!",
+		})
+		return
+	}
+
+	if saving.Accumulated.Compare(saving.Goal) >= 0 {
+		saving.Priority = 0
+	}
+
+	if savingToUpdate.Priority == saving.Priority {
+		err = cr.savingUseCase.Update(ctx.Request.Context(), saving)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{
+				"code":    http.StatusConflict,
+				"message": error_message.ErrUpdateSaving,
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Caixinha editada com sucesso!",
+			"data": gin.H{
+				"id": saving.ID,
+			},
+		})
+		return
+	}
+
+	if len(allSavings) > 0 {
+		err = cr.ReorderSavings(ctx, saving, savingToUpdate, allSavings)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{
+				"code":    http.StatusPartialContent,
+				"message": "Caixinha atualizada com sucesso, mas erro ao atualizar a prioridade das caixinhas",
+			})
+			return
+		}
+	}
+
+	if savingToUpdate.Description != saving.Description {
+		err = cr.UpdateExpenseBySaving(ctx, userId, saving.ID, saving.Description, saving.Accumulated.Compare(saving.Goal) >= 0)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusPartialContent, gin.H{
+				"code":    http.StatusPartialContent,
+				"message": "Caixinha atualizada com sucesso, mas erro ao atualizar despesas relacionadas a caixinha",
+			})
+			return
+		}
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
@@ -370,6 +490,83 @@ func (cr *SavingHandler) DeleteExpenseBySaving(ctx *gin.Context, userId int, sav
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (cr *SavingHandler) ReorderSavings(ctx *gin.Context, saving entity.Saving, savingToUpdate entity.Saving, allSavings []entity.Saving) (err error) {
+	if saving.Priority == 0 {
+		for _, sav := range allSavings {
+			if sav.ID == savingToUpdate.ID || sav.DeletedAt.Valid {
+				continue
+			}
+			if sav.Priority > savingToUpdate.Priority {
+				sav.Priority = sav.Priority - 1
+				err = cr.savingUseCase.Update(ctx.Request.Context(), sav)
+				if err != nil {
+					log.NewLogger().Error("Erro ao atualizar prioridade do saving:", err)
+				}
+			}
+		}
+	} else if savingToUpdate.Priority < saving.Priority {
+		for _, sav := range allSavings {
+			if sav.ID == savingToUpdate.ID || sav.DeletedAt.Valid {
+				continue
+			}
+			if sav.Priority > savingToUpdate.Priority && sav.Priority <= saving.Priority {
+				sav.Priority = sav.Priority - 1
+				err = cr.savingUseCase.Update(ctx.Request.Context(), sav)
+				if err != nil {
+					log.NewLogger().Error("Erro ao atualizar prioridade do saving:", err)
+				}
+			}
+		}
+	} else if savingToUpdate.Priority > saving.Priority {
+		for _, sav := range allSavings {
+			if sav.ID == savingToUpdate.ID || sav.DeletedAt.Valid {
+				continue
+			}
+			if sav.Priority < savingToUpdate.Priority && sav.Priority >= saving.Priority {
+				sav.Priority = sav.Priority + 1
+				err = cr.savingUseCase.Update(ctx.Request.Context(), sav)
+				if err != nil {
+					log.NewLogger().Error("Erro ao atualizar prioridade do saving:", err)
+				}
+			}
+		}
+	}
+
+	err = cr.savingUseCase.Update(ctx.Request.Context(), saving)
+	if err != nil {
+		log.NewLogger().Error("Erro ao atualizar prioridade final do saving:", err)
+	}
+
+	return nil
+}
+
+func (cr *SavingHandler) UpdateExpenseBySaving(ctx *gin.Context, userId int, savingId int, description string, isPaid bool) error {
+	expenses, err := cr.expenseUseCase.GetExpenseBySavingId(ctx, userId, savingId)
+	if err != nil {
+		return err
+	}
+
+	countErrors := 0
+	if len(expenses) > 0 {
+		for _, expense := range expenses {
+			expense.Description = description
+			if isPaid {
+				expense.Paid = 1
+			}
+			err = cr.expenseUseCase.Update(ctx, expense)
+			if err != nil {
+				countErrors += 1
+			}
+		}
+	}
+
+	if countErrors > 0 {
+		return fmt.Errorf("erro ao atualizar %d despesas relacionadas a caixinha", countErrors)
 	}
 
 	return nil

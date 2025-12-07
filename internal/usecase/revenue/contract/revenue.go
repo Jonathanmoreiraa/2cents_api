@@ -11,7 +11,7 @@ type RevenueUseCase interface {
 	GetAllRevenues(ctx context.Context, userId int) ([]entity.Revenue, error)
 	GetRevenue(ctx context.Context, id int) (entity.Revenue, error)
 	GetRevenues(ctx context.Context, filters map[string]any) ([]entity.Revenue, error)
-	GetRevenuesByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error)
+	GetRevenuesByDates(ctx context.Context, userId int, dateStart string, dateEnd string, received *bool) ([]entity.GraphicMonthTotal, error)
 	Update(ctx context.Context, revenue entity.Revenue) error
 	Delete(ctx context.Context, revenue entity.Revenue) error
 }

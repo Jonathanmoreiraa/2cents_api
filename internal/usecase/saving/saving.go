@@ -47,6 +47,15 @@ func (useCase *savingUseCase) GetSaving(ctx context.Context, id int) (entity.Sav
 	return saving, nil
 }
 
+func (useCase *savingUseCase) GetSavings(ctx context.Context, filters map[string]any) ([]entity.Saving, error) {
+	revenue, err := useCase.savingRepo.FindByFilter(ctx, filters)
+	if err != nil {
+		return []entity.Saving{}, util.ErrorWithMessage(err, error_message.ErrFindSaving)
+	}
+
+	return revenue, nil
+}
+
 func (useCase *savingUseCase) Update(ctx context.Context, saving entity.Saving) error {
 	err := useCase.savingRepo.Update(ctx, saving)
 	if err != nil {

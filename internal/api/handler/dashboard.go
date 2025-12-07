@@ -57,7 +57,7 @@ func (cr *DashboardHandler) LastExpensesRevenueGraphic(ctx *gin.Context) {
 
 	end := time.Now()
 	sixMonthsAgo := end.AddDate(0, -6, 0)
-	dates := GetSixMonthsFormatedDateStartEnd(sixMonthsAgo, end)
+	dates := GetMonthsFormatedDateStartEnd(sixMonthsAgo, end)
 
 	expenses, err := cr.expenseUseCase.GetExpensesByDates(ctx, userId, dates.dateStart, dates.dateEnd)
 	if err != nil || len(expenses) == 0 {
@@ -68,7 +68,8 @@ func (cr *DashboardHandler) LastExpensesRevenueGraphic(ctx *gin.Context) {
 		return
 	}
 
-	revenues, err := cr.revenueUseCase.GetRevenuesByDates(ctx, userId, dates.dateStart, dates.dateEnd)
+	var received bool = true
+	revenues, err := cr.revenueUseCase.GetRevenuesByDates(ctx, userId, dates.dateStart, dates.dateEnd, &received)
 	if err != nil || len(revenues) == 0 {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
@@ -98,7 +99,7 @@ func (cr *DashboardHandler) LastMonthSituation(ctx *gin.Context) {
 
 	end := time.Now()
 	oneMonthAgo := end.AddDate(0, 0, 0)
-	dates := GetSixMonthsFormatedDateStartEnd(oneMonthAgo, end)
+	dates := GetMonthsFormatedDateStartEnd(oneMonthAgo, end)
 
 	expenses, err := cr.expenseUseCase.GetExpensesByDates(ctx, userId, dates.dateStart, dates.dateEnd)
 	if err != nil || len(expenses) == 0 {
@@ -109,7 +110,11 @@ func (cr *DashboardHandler) LastMonthSituation(ctx *gin.Context) {
 		return
 	}
 
-	revenues, err := cr.revenueUseCase.GetRevenuesByDates(ctx, userId, dates.dateStart, dates.dateEnd)
+	received := true
+	if ctx.Request.URL.Query().Get("received") == "false" {
+		received = false
+	}
+	revenues, err := cr.revenueUseCase.GetRevenuesByDates(ctx, userId, dates.dateStart, dates.dateEnd, &received)
 	if err != nil || len(revenues) == 0 {
 		ctx.AbortWithStatusJSON(http.StatusNotFound, gin.H{
 			"code":    http.StatusNotFound,
@@ -139,7 +144,7 @@ func (cr *DashboardHandler) ExpensesByCategory(ctx *gin.Context) {
 
 	end := time.Now()
 	oneMonthAgo := end.AddDate(0, 0, 0)
-	dates := GetSixMonthsFormatedDateStartEnd(oneMonthAgo, end)
+	dates := GetMonthsFormatedDateStartEnd(oneMonthAgo, end)
 
 	expenses, err := cr.expenseUseCase.GetCountCategoryForExpenses(ctx, userId, dates.dateStart, dates.dateEnd)
 	if err != nil || len(expenses) == 0 {
@@ -166,7 +171,7 @@ func (cr *DashboardHandler) GetTaxes(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, lastTaxes)
 }
 
-func GetSixMonthsFormatedDateStartEnd(start time.Time, end time.Time) FormatedDate {
+func GetMonthsFormatedDateStartEnd(start time.Time, end time.Time) FormatedDate {
 	firstDate := time.Date(
 		start.Year(),
 		start.Month(),

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	entity "github.com/jonathanmoreiraa/2cents/internal/domain/model"
@@ -30,6 +31,8 @@ func (database *savingDatabase) FindAll(ctx context.Context, userId int) ([]enti
 	query := database.DB.
 		Where("user_id = ?", userId).
 		Where("deleted_at IS NULL").
+		Where("priority > 0").
+		Order("priority ASC").
 		Find(&savings)
 
 	err := query.Error
@@ -41,6 +44,39 @@ func (database *savingDatabase) FindByID(ctx context.Context, id int) (entity.Sa
 
 	err := database.DB.First(&saving, id).Error
 	return saving, err
+}
+
+func (database *savingDatabase) FindByFilter(ctx context.Context, filters map[string]any) (savings []entity.Saving, err error) {
+	query := database.DB.
+		Where("user_id = ?", filters["user_id"]).
+		Where("deleted_at IS NULL")
+
+	if description, ok := filters["description"]; ok && description != "" {
+		query = query.Where("description LIKE ?", "%"+description.(string)+"%")
+	}
+	if status, ok := filters["status"]; ok && status != nil {
+		statusStruct := status.(struct {
+			Completed bool `json:"completed"`
+			Pending   bool `json:"pending"`
+		})
+		conditions := []string{}
+
+		if statusStruct.Completed {
+			conditions = append(conditions, "priority = 0")
+		}
+		if statusStruct.Pending {
+			conditions = append(conditions, "priority > 0")
+		}
+
+		if len(conditions) > 0 {
+			query = query.Where(strings.Join(conditions, " OR "))
+		}
+	}
+
+	query = query.Order("priority ASC")
+	err = query.Find(&savings).Error
+
+	return savings, err
 }
 
 func (database *savingDatabase) Update(ctx context.Context, saving entity.Saving) error {

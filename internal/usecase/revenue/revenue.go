@@ -56,8 +56,8 @@ func (useCase *revenueUseCase) GetRevenues(ctx context.Context, filters map[stri
 	return revenue, nil
 }
 
-func (useCase *revenueUseCase) GetRevenuesByDates(ctx context.Context, userId int, dateStart string, dateEnd string) ([]entity.GraphicMonthTotal, error) {
-	expense, err := useCase.revenueRepo.FindByDates(ctx, userId, dateStart, dateEnd)
+func (useCase *revenueUseCase) GetRevenuesByDates(ctx context.Context, userId int, dateStart string, dateEnd string, received *bool) ([]entity.GraphicMonthTotal, error) {
+	expense, err := useCase.revenueRepo.FindByDates(ctx, userId, dateStart, dateEnd, received)
 	if err != nil {
 		return []entity.GraphicMonthTotal{}, util.ErrorWithMessage(err, error_message.ErrFindExpense)
 	}
