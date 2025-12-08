@@ -97,8 +97,9 @@ func (cr *DashboardHandler) LastMonthSituation(ctx *gin.Context) {
 		return
 	}
 
-	end := time.Now()
-	oneMonthAgo := end.AddDate(0, 0, 0)
+	y, m, _ := time.Now().Date()
+	end := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC)
+	oneMonthAgo := time.Now().AddDate(0, 0, 0)
 	dates := GetMonthsFormatedDateStartEnd(oneMonthAgo, end)
 
 	expenses, err := cr.expenseUseCase.GetExpensesByDates(ctx, userId, dates.dateStart, dates.dateEnd)
@@ -142,8 +143,9 @@ func (cr *DashboardHandler) ExpensesByCategory(ctx *gin.Context) {
 		return
 	}
 
-	end := time.Now()
-	oneMonthAgo := end.AddDate(0, 0, 0)
+	y, m, _ := time.Now().Date()
+	end := time.Date(y, m+1, 0, 0, 0, 0, 0, time.UTC)
+	oneMonthAgo := time.Now().AddDate(0, 0, 0)
 	dates := GetMonthsFormatedDateStartEnd(oneMonthAgo, end)
 
 	expenses, err := cr.expenseUseCase.GetCountCategoryForExpenses(ctx, userId, dates.dateStart, dates.dateEnd)
